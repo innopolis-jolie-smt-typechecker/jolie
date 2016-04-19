@@ -76,10 +76,11 @@ public class CommandLineParser implements Closeable
 	private final boolean isProgramCompiled;
 	private final boolean typeCheck;
 	private final boolean tracer;
-        private final boolean check;
+	private final boolean check;
 	private final Level logLevel;
 	private File programDirectory = null;
-	
+	private  boolean performFormatting;
+
 	/**
 	 * Returns the arguments passed to the JOLIE program.
 	 * @return the arguments passed to the JOLIE program.
@@ -224,6 +225,13 @@ public class CommandLineParser implements Closeable
 	public Map< String, Scanner.Token > definedConstants()
 	{
 		return constants;
+	}
+
+	/**
+	 *
+	 */
+	public boolean performFormatting() {
+		return performFormatting;
 	}
 
 	/**
@@ -473,42 +481,44 @@ public class CommandLineParser implements Closeable
 				optionsList.add( argsList.get( i ) );
 			} else if ( "--version".equals( argsList.get( i ) ) ) {
 				throw new CommandLineException( getVersionString() );
+			} else if ("-f".equals(argsList.get(i)) || "--format".equals(argsList.get(i))) { // perform formatting
+				performFormatting = true;
 			} else if (
-				argsList.get( i ).endsWith( ".ol" )
-				||
-				argsList.get( i ).endsWith( ".iol" )
-				||
-				argsList.get( i ).endsWith( ".olc" )
-			) {
-				if ( olFilepath == null ) {
-					olFilepath = argsList.get( i );
+					argsList.get(i).endsWith(".ol")
+							||
+							argsList.get(i).endsWith(".iol")
+							||
+							argsList.get(i).endsWith(".olc")
+					) {
+				if (olFilepath == null) {
+					olFilepath = argsList.get(i);
 				} else {
-					programArgumentsList.add( argsList.get( i ) );
+					programArgumentsList.add(argsList.get(i));
 				}
-			} else if ( argsList.get( i ).endsWith( ".jap" ) ) {
-				if ( olFilepath == null ) {
-					String japFilename = new File( argsList.get( i ) ).getCanonicalPath();
-					JarFile japFile = new JarFile( japFilename );
+			} else if (argsList.get(i).endsWith(".jap")) {
+				if (olFilepath == null) {
+					String japFilename = new File(argsList.get(i)).getCanonicalPath();
+					JarFile japFile = new JarFile(japFilename);
 					Manifest manifest = japFile.getManifest();
-					olFilepath = parseJapManifestForMainProgram( manifest, japFile );
-					if ( Helpers.getOperatingSystemType() == Helpers.OSType.Windows ) {
-						olFilepath = olFilepath.replace( "\\", "/" );
+					olFilepath = parseJapManifestForMainProgram(manifest, japFile);
+					if (Helpers.getOperatingSystemType() == Helpers.OSType.Windows) {
+						olFilepath = olFilepath.replace("\\", "/");
 					}
-					libList.add( japFilename );
-					Collection< String> japOptions = parseJapManifestForOptions( manifest );
-					argsList.addAll( i + 1, japOptions );
+					libList.add(japFilename);
+					Collection<String> japOptions = parseJapManifestForOptions(manifest);
+					argsList.addAll(i + 1, japOptions);
 					japUrl = japFilename + "!";
-					programDirectory = new File( japFilename ).getParentFile();
+					programDirectory = new File(japFilename).getParentFile();
 				} else {
-					programArgumentsList.add( argsList.get( i ) );
+					programArgumentsList.add(argsList.get(i));
 				}
 			} else {
 				// It's an unrecognized argument
-				int newIndex = argHandler.onUnrecognizedArgument( argsList, i );
-				if ( newIndex == i ) {
+				int newIndex = argHandler.onUnrecognizedArgument(argsList, i);
+				if (newIndex == i) {
 					// The handler didn't change the index.
 					// We abort so to avoid infinite looping.
-					throw new CommandLineException( "Unrecognized command line option: " + argsList.get( i ) );
+					throw new CommandLineException("Unrecognized command line option: " + argsList.get(i));
 				}
 				i = newIndex;
 			}

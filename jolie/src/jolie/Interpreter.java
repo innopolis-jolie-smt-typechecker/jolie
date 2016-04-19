@@ -21,12 +21,7 @@
 
 package jolie;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.lang.ref.WeakReference;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -55,6 +50,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
+
+import jolie.formatter.Formatter;
+import jolie.formatter.FormatterVisitor;
 import jolie.lang.Constants;
 import jolie.lang.parse.OLParseTreeOptimizer;
 import jolie.lang.parse.OLParser;
@@ -1230,14 +1228,19 @@ public class Interpreter
 				if ( this.internalServiceProgram != null ) {
 					program = this.internalServiceProgram;
 				} else {
-					final OLParser olParser = new OLParser( new Scanner( cmdParser.programStream(), cmdParser.programFilepath().toURI(), cmdParser.charset() ), includePaths, classLoader );
-
+					OLParser olParser = new OLParser( new Scanner( cmdParser.programStream(), cmdParser.programFilepath().toURI(), cmdParser.charset() ), includePaths, classLoader );
 					olParser.putConstants( cmdParser.definedConstants() );
 					program = olParser.parse();
 				}
 				program = OLParseTreeOptimizer.optimize( program );
 			}
-			
+
+			if (cmdParser.performFormatting()) {
+				System.out.println("format");
+			} else {
+				System.out.println("Do not format");
+			}
+
 			cmdParser.close();
 
 			check = cmdParser.check();
@@ -1273,6 +1276,7 @@ public class Interpreter
 			if ( check ) {
 				return false;
 			} else {
+
 				return (new OOITBuilder(
 					this,
 					program,
