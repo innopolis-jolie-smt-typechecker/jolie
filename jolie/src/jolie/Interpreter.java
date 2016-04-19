@@ -24,6 +24,7 @@ package jolie;
 import java.io.*;
 import java.lang.ref.WeakReference;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -51,8 +52,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import jolie.formatter.Formatter;
-import jolie.formatter.FormatterVisitor;
+// import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
 import jolie.lang.Constants;
 import jolie.lang.parse.OLParseTreeOptimizer;
 import jolie.lang.parse.OLParser;
@@ -285,6 +285,8 @@ public class Interpreter
 	private final String programFilename;
 	private final File programDirectory;
 	private OutputPort monitor = null;
+
+	private boolean formattingMode;
 
 	public void setMonitor( OutputPort monitor )
 	{
@@ -838,6 +840,7 @@ public class Interpreter
 		optionArgs = cmdParser.optionArgs();
 		programFilename = cmdParser.programFilepath().getName();
 		arguments = cmdParser.arguments();
+		formattingMode = cmdParser.performFormatting();
         
 		this.correlationEngine = cmdParser.correlationAlgorithmType().createInstance( this );
 		
@@ -1028,15 +1031,15 @@ public class Interpreter
 	private void init()
 		throws InterpreterException, IOException
 	{
-            /**
-            * Order is important.
-             * 1 - CommCore needs the OOIT to be initialized.
-             * 2 - initExec must be instantiated before we can receive communications.
-             */
-            if ( buildOOIT() == false && !check ) {
-                throw new InterpreterException( "Error: the interpretation environment couldn't have been initialized" );
-            }
-            if ( check ){
+		/**
+		* Order is important.
+		 * 1 - CommCore needs the OOIT to be initialized.
+		 * 2 - initExec must be instantiated before we can receive communications.
+		 */
+		if ( buildOOIT() == false && !check ) {
+			throw new InterpreterException( "Error: the interpretation environment couldn't have been initialized" );
+		}
+		if ( check ){
                 exit();
             } else {
                 sessionStarters = Collections.unmodifiableMap( sessionStarters );
@@ -1232,13 +1235,18 @@ public class Interpreter
 					olParser.putConstants( cmdParser.definedConstants() );
 					program = olParser.parse();
 				}
-				program = OLParseTreeOptimizer.optimize( program );
+				OLParseTreeOptimizer optimizer = new OLParseTreeOptimizer();
+				program = optimizer.optimize(program);
 			}
 
-			if (cmdParser.performFormatting()) {
-				System.out.println("format");
-			} else {
-				System.out.println("Do not format");
+			// format file if option was passed as an argument
+			if (formattingMode) {
+				try {
+					formatFile();
+					System.out.println("Formatting successful");
+				} catch (Exception e) {
+					throw new InterpreterException(e);
+				}
 			}
 
 			cmdParser.close();
@@ -1290,6 +1298,40 @@ public class Interpreter
 		} finally {
 			cmdParser = null; // Free memory
 		}
+	}
+
+	/**
+	 * Performs formatting of a file on which interpreter is run.
+	 * Creates temporary copy of a file in which writes formatted code.
+	 * Upon completion replaces original file with temporary.
+	 * @throws IOException if something goes wrong. Original file remains untouched.
+	 */
+	private void formatFile() throws InterpreterException {
+		String tempFileName = programDirectory + "/" + programFilename + ".temp";
+		File tempFile = new File(tempFileName);
+
+		try {
+			Writer fw = new FileWriter(tempFile);
+			fw.write("hello there");
+			// formatting stuff
+			fw.close();
+		} catch (Exception e) {
+			throw new InterpreterException(e);
+		}
+
+		// if no exception was caught assume formatting done successfully.
+		replaceOriginalFile(tempFile);
+
+		// remove temp file
+		// tempFile.delete();
+	}
+
+	/**
+	 * Replace original program file with
+	 * @param replacementFile
+     */
+	public void replaceOriginalFile(File replacementFile) {
+		// replace file when correctness of formatting is ensured
 	}
 	
 	/**
