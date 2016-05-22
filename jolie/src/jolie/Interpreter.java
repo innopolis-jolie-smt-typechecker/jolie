@@ -24,7 +24,6 @@ package jolie;
 import java.io.*;
 import java.lang.ref.WeakReference;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,6 +52,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 // import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
+import jolie.formatter.Formatter;
 import jolie.lang.Constants;
 import jolie.lang.parse.OLParseTreeOptimizer;
 import jolie.lang.parse.OLParser;
@@ -1242,7 +1242,7 @@ public class Interpreter
 			// format file if option was passed as an argument
 			if (formattingMode) {
 				try {
-					formatFile();
+					formatProgram(program);
 					System.out.println("Formatting successful");
 				} catch (Exception e) {
 					throw new InterpreterException(e);
@@ -1302,19 +1302,19 @@ public class Interpreter
 
 	/**
 	 * Performs formatting of a file on which interpreter is run.
+	 * @param program is an AST based on which formatted file is created.
 	 * Creates temporary copy of a file in which writes formatted code.
 	 * Upon completion replaces original file with temporary.
 	 * @throws IOException if something goes wrong. Original file remains untouched.
 	 */
-	private void formatFile() throws InterpreterException {
+	private void formatProgram(Program program) throws InterpreterException {
 		String tempFileName = programDirectory + "/" + programFilename + ".temp";
 		File tempFile = new File(tempFileName);
 
 		try {
 			Writer fw = new FileWriter(tempFile);
-			fw.write("hello there");
-			// formatting stuff
-			fw.close();
+			Formatter formatter = new Formatter(fw, program);
+			formatter.run();
 		} catch (Exception e) {
 			throw new InterpreterException(e);
 		}
