@@ -35,6 +35,7 @@ public class FormatterVisitor implements OLVisitor {
         if (node != null) {
             System.out.println(node);
             node.accept(this);
+            System.out.println(writer.getIndentation());
         }
     }
 
@@ -217,27 +218,42 @@ public class FormatterVisitor implements OLVisitor {
         writer.writeIndented("");
         format(n.variablePath());
         writer.write(" = ");
+        int ind = writer.getIndentation();
+        writer.setIndentation(0);
         format(n.expression());
+        writer.setIndentation(ind);
     }
 
     @Override
     public void visit(AddAssignStatement n) {
-
+        writer.writeIndented("");
+        format(n.variablePath());
+        writer.write(" += ");
+        format(n.expression());
     }
 
     @Override
     public void visit(SubtractAssignStatement n) {
-
+        writer.writeIndented("");
+        format(n.variablePath());
+        writer.write(" -= ");
+        format(n.expression());
     }
 
     @Override
     public void visit(MultiplyAssignStatement n) {
-
+        writer.writeIndented("");
+        format(n.variablePath());
+        writer.write(" *= ");
+        format(n.expression());
     }
 
     @Override
     public void visit(DivideAssignStatement n) {
-
+        writer.writeIndented("");
+        format(n.variablePath());
+        writer.write(" /= ");
+        format(n.expression());
     }
 
     @Override
@@ -270,7 +286,7 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(DefinitionCallStatement n) {
-
+        writer.writeIndented(n.id());
     }
 
     @Override
@@ -287,7 +303,13 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(OrConditionNode n) {
-
+        int i = 0;
+        format(n.children().get(0));
+        i++;
+        for (; i < n.children().size(); i++) {
+            writer.write(" || ");
+            format(n.children().get(i));
+        }
     }
 
     @Override
@@ -412,11 +434,32 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(Scope n) {
-
+        writer.writeIndented("scope (");
+        writer.writeLine(n.id() + ")");
+        writer.writeLineIndented("{");
+        writer.indent();
+        format(n.body());
+        writer.writeLine();
+        writer.unindent();
+        writer.writeIndented("}");
     }
 
     @Override
     public void visit(InstallStatement n) {
+        writer.writeLineIndented("install(");
+
+        for (Pair<String, OLSyntaxNode> node : n.handlersFunction().pairs()) {
+            writer.indent();
+            writer.writeIndented(node.key());
+            writer.write(" => ");
+            int indentation = writer.getIndentation();
+            writer.setIndentation(0);
+            format(node.value());
+            writer.setIndentation(indentation);
+            writer.unindent();
+        }
+        writer.writeLine();
+        writer.writeIndented(")");
 
     }
 
@@ -470,6 +513,7 @@ public class FormatterVisitor implements OLVisitor {
     @Override
     public void visit(InputPortInfo n) {
         writer.writeLineIndented("inputPort " + n.id() + " {");
+        writer.indent();
         writer.writeIndented("Location: ");
         writer.writeLine("\"" + n.location().toString() + "\"");
         if (n.protocolId() != null) {
@@ -487,6 +531,7 @@ public class FormatterVisitor implements OLVisitor {
             }
             writer.writeLine();
         }
+        writer.unindent();
         writer.writeLineIndented("}");
         writer.writeLine();
     }
@@ -494,6 +539,7 @@ public class FormatterVisitor implements OLVisitor {
     @Override
     public void visit(OutputPortInfo n) {
         writer.writeLineIndented("outputPort " + n.id() + " {");
+        writer.indent();
         if (n.location() != null) {
             writer.writeIndented("Location: ");
             writer.writeLine("\"" + n.location().toString() + "\"");
@@ -513,14 +559,18 @@ public class FormatterVisitor implements OLVisitor {
             }
             writer.writeLine();
         }
-        printOperationDeclarations(n);
+//        printOperationDeclarations(n);
+        writer.unindent();
         writer.writeLineIndented("}");
         writer.writeLine();
     }
 
     @Override
     public void visit(PointerStatement n) {
-
+        writer.writeIndented("");
+        format(n.leftPath());
+        writer.write(" -> ");
+        format(n.rightPath());
     }
 
     @Override
@@ -579,12 +629,34 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(ForStatement n) {
-
+        writer.writeIndented("for (");
+        writer.unindent();
+        format(n.init());
+        writer.write(", ");
+        format(n.condition());
+        writer.write(", ");
+        format(n.post());
+        writer.indent();
+        writer.writeLine(") {");
+        writer.indent();
+        format(n.body());
+        writer.unindent();
+        writer.writeLine();
+        writer.writeIndented("}");
     }
 
     @Override
     public void visit(ForEachStatement n) {
-
+        writer.writeIndented("foreach (");
+        format(n.keyPath());
+        writer.write(" : ");
+        format(n.targetPath());
+        writer.writeLine(") {");
+        writer.indent();
+        format(n.body());
+        writer.unindent();
+        writer.writeLine();
+        writer.writeIndented("}");
     }
 
     @Override
@@ -653,6 +725,9 @@ public class FormatterVisitor implements OLVisitor {
         for (int i = 0; i < n.path().size(); i++) {
             Pair<OLSyntaxNode, OLSyntaxNode> node = n.path().get(i);
             writer.setPrintQuotes(false);
+            if ( n.isGlobal() ) {
+                writer.write( "global." );
+            }
             format(node.key());
             writer.setPrintQuotes(true);
 
@@ -660,7 +735,8 @@ public class FormatterVisitor implements OLVisitor {
                 int value = ((ConstantIntegerExpression) node.value()).value();
             }
 
-            if (node.value() instanceof ConstantIntegerExpression //&&
+            if (node.value() instanceof ConstantIntegerExpression
+                || node.value() instanceof VariableExpressionNode//&&
                 //!(((ConstantIntegerExpression) node.value()).value() == 0)
                     ) {
                 writer.write("[");
@@ -680,7 +756,7 @@ public class FormatterVisitor implements OLVisitor {
         }
         writer.write(n.id());
         format(n.cardinality());
-        writer.write(":" + n.nativeType().id());
+        writer.write(": " + n.nativeType().id());
         if (n.untypedSubTypes()) {
             writer.write(" { ? }");
         } else if (n.hasSubTypes()) {
@@ -711,8 +787,10 @@ public class FormatterVisitor implements OLVisitor {
             writer.write("?");
         } else if (r.min() == 0 && r.max() == Integer.MAX_VALUE) {
             writer.write("*");
+        } else if (r.max() == Integer.MAX_VALUE) {
+            writer.write("[" + r.min() + ", " + "*]");
         } else {
-            writer.write("[" + r.min() + "," + r.max() + "]");
+            writer.write("[" + r.min() + ", " + r.max() + "]");
         }
     }
 
@@ -725,6 +803,7 @@ public class FormatterVisitor implements OLVisitor {
     public void visit(InterfaceDefinition n) {
         writer.writeLineIndented("interface " + n.name() + " {");
         printOperationDeclarations(n);
+        writer.unindent();
         writer.writeLineIndented("}");
         writer.writeLine();
     }
@@ -813,6 +892,7 @@ public class FormatterVisitor implements OLVisitor {
             writer.writeLine();
         }
         if (rr.isEmpty() == false) {
+            writer.indent();
             writer.writeLineIndented("RequestResponse:");
             writer.indent();
             writer.writeIndented("");

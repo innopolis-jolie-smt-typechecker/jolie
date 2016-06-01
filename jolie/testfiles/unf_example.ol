@@ -1,18 +1,18 @@
-//include "console.iol"
+
 
 
 define Arithmetic
 {
     a = 3.4 + 2.1;
-    b = true;
-    c = 10L;
-    a = 5;
-    b = 3 + 2;
-    c = 4 - 3;
-    d = 7 / c;
-    e = 5 * d;
-    f = --a + 2;
-    g = f % 5
+b = true;
+  c = 10L;
+      a = 5;
+      b = 3 + 2;
+      c = 4 - 3;
+      d = 7 / c;
+      e = 5 * d;
+      f = --a + 2;
+     g = f % 5
 }
 
 define Casting
@@ -100,7 +100,7 @@ define Loops
         a++
     };
     for ( i = 0, i < 50 || i != 50, i++ ) {
-  	    a[i] += i
+  	a[i] += i
     }
 }
 
@@ -172,7 +172,6 @@ main
     };
 
     globalVariable = 3;
-    Loops;
     a = global.globalVariable;
     println@Console( "Hello, world!" )()
 }
