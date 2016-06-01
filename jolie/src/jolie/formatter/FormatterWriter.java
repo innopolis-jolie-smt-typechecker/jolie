@@ -11,14 +11,24 @@ public class FormatterWriter {
     private Writer writer;
     private int indentation = 0;
     private StringBuilder sb;
+    private boolean shouldPrintQuotes;
 
     public FormatterWriter(Writer writer) {
         this.writer = writer;
         sb = new StringBuilder();
+        shouldPrintQuotes = true;
     }
 
     public int getIndentation() {
         return indentation;
+    }
+
+    public void setPrintQuotes(boolean shouldPrintQuotes) {
+        this.shouldPrintQuotes = shouldPrintQuotes;
+    }
+
+    public boolean shouldPrintQuotes() {
+        return shouldPrintQuotes;
     }
 
     protected void setIndentation(int indentation) {
@@ -49,8 +59,8 @@ public class FormatterWriter {
     public void writeIndented(String s) {
         for (int i = 0; i < indentation; i++) {
             sb.append("\t");
-            sb.append(s);
         }
+        sb.append(s);
     }
 
     public void indent() {

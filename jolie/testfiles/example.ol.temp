@@ -1,0 +1,61 @@
+define Loops
+{
+	a = 0;
+	while (a < 10) {
+		a++
+	};
+
+}
+
+define DataStructures
+{
+	animals.pet[0].name = "cat";
+	animals.pet[1].name = "dog";
+	animals.wild[0].name = "tiger";
+	animals.wild[1].name = "lion";
+;
+	animals.pet[0].name = "cat";
+	animals.pet[1].name = "dog";
+	animals.wild[0].name = "tiger";
+	animals.wild[1].name = "lion";
+	zoo.sector_a << animals;
+	undef(animals);
+	a.b.c.d[0] = "zero";
+	a.b.c.d[1] = "one";
+	a.b.c.d[2] = "two";
+	a.b.c.d[3] = "three";
+;
+
+}
+
+type SumRequest:void {
+	.number[2,2147483647]:int
+}
+
+interface SumInterface {
+RequestResponse:
+	sum(SumRequest)(int)
+}
+
+inputPort SumInput {
+Location: "socket://localhost:8000/"
+Protocol: soap
+Interfaces: SumInterface
+}
+
+outputPort SumServ {
+Location: "socket://localhost:8000/"
+Protocol: soap
+Interfaces: SumInterface
+RequestResponse:
+	sum(SumRequest)(int)
+}
+
+main
+{
+;
+	globalVariable = 3;
+	a = globalVariable;
+	println@Console("Hello, world!")()
+}
+

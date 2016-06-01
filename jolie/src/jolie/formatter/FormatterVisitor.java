@@ -53,6 +53,12 @@ public class FormatterVisitor implements OLVisitor {
             case RANGLE:
                 s = ">";
                 break;
+            case MAJOR_OR_EQUAL:
+                s = ">=";
+                break;
+            case MINOR_OR_EQUAL:
+                s = "<=";
+                break;
         }
         writer.write(s);
     }
@@ -93,7 +99,16 @@ public class FormatterVisitor implements OLVisitor {
     @Override
     public void visit(ParallelStatement n) {
         for (int i = 0; i < n.children().size(); i++) {
+            System.out.println(n.children().get(i));
+            if (n.children().get(i) instanceof SequenceStatement) {
+                writer.writeLineIndented("{");
+                writer.indent();
+            }
             format(n.children().get(i));
+            if (n.children().get(i) instanceof SequenceStatement) {
+                writer.unindent();
+                writer.writeLineIndented("}");
+            }
             writer.writeLine();
             if (i < n.children().size() - 1) {
                 writer.writeLineIndented("|");
@@ -153,15 +168,20 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(RequestResponseOperationStatement n) {
-        writer.writeIndented(n.id() + "(");
+        writer.write(n.id() + "(");
+        System.out.println(writer.getIndentation());
         format(n.inputVarPath());
         writer.write(")(");
         format(n.outputExpression());
         writer.writeLineIndented(") {");
         writer.indent();
+        writer.indent();
+        System.out.println(n.process());
         format(n.process());
         writer.unindent();
+        writer.unindent();
         writer.writeLineIndented("");
+        writer.indent();
         writer.writeIndented("}");
     }
 
@@ -255,7 +275,14 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(WhileStatement n) {
-
+        writer.writeIndented("while (");
+        format(n.condition());
+        writer.writeLine(") {");
+        writer.indent();
+        format(n.body());
+        writer.unindent();
+        writer.writeLine();
+        writer.writeIndented("}");
     }
 
     @Override
@@ -290,35 +317,70 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(ConstantIntegerExpression n) {
-        writer.write("\"");
+        //writer.write("\"");
         writer.write(Integer.toString(n.value()));
-        writer.write("\"");
+        //writer.write("\"");
 
     }
 
     @Override
     public void visit(ConstantDoubleExpression n) {
-
+        writer.write(Double.toString(n.value()));
     }
 
     @Override
     public void visit(ConstantBoolExpression n) {
-
+        writer.write(Boolean.toString(n.value()));
     }
 
     @Override
     public void visit(ConstantLongExpression n) {
-
+        writer.write(Long.toString(n.value()) + "L");
     }
 
     @Override
     public void visit(ConstantStringExpression n) {
-
+        if (writer.shouldPrintQuotes()) {
+            writer.write("\"");
+        }
+        String s = n.value();
+        // TODO: add special characters handling.
+        s = s.replace("\n", "\\n");
+        writer.write(s);
+        if (writer.shouldPrintQuotes()) {
+            writer.write("\"");
+        }
     }
 
     @Override
     public void visit(ProductExpressionNode n) {
-
+        Pair<Constants.OperandType, OLSyntaxNode> pair;
+        Iterator<Pair<Constants.OperandType, OLSyntaxNode>> it =
+                n.operands().iterator();
+        for (int i = 0; i < n.operands().size(); i++) {
+            pair = it.next();
+            if (i > 0) {
+                switch (pair.key()) {
+                    case MULTIPLY:
+                        writer.write(" * ");
+                        break;
+                    case DIVIDE:
+                        writer.write(" / ");
+                        break;
+                    case MODULUS:
+                        writer.write(" % ");
+                        break;
+                    default:
+                        break;
+                }
+                //if (pair.key() == Constants.OperandType.ADD) {
+                //   writer.write(" + ");
+                //} else {
+                //   writer.write(" - ");
+                //}
+            }
+            format(pair.value());
+        }
     }
 
     @Override
@@ -340,7 +402,7 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(VariableExpressionNode n) {
-
+        format(n.variablePath());
     }
 
     @Override
@@ -489,24 +551,28 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(PreIncrementStatement n) {
+        writer.writeIndented("");
         writer.write("++");
         format(n.variablePath());
     }
 
     @Override
     public void visit(PostIncrementStatement n) {
+        writer.writeIndented("");
         format(n.variablePath());
         writer.write("++");
     }
 
     @Override
     public void visit(PreDecrementStatement n) {
+        writer.writeIndented("");
         writer.write("--");
         format(n.variablePath());
     }
 
     @Override
     public void visit(PostDecrementStatement n) {
+        writer.writeIndented("");
         format(n.variablePath());
         writer.write("--");
     }
@@ -537,7 +603,17 @@ public class FormatterVisitor implements OLVisitor {
 
     @Override
     public void visit(InstanceOfExpressionNode n) {
-
+        if (n.expression() instanceof AssignStatement) {
+            writer.write("(");
+            format(((AssignStatement) n.expression()).variablePath());
+            writer.write(" = ");
+            format(((AssignStatement) n.expression()).expression());
+            writer.write(")");
+        } else {
+            format(n.expression());
+        }
+        writer.write(" instanceof ");
+        writer.write(n.type().id());
     }
 
     @Override
@@ -576,10 +652,16 @@ public class FormatterVisitor implements OLVisitor {
     public void visit(VariablePathNode n) {
         for (int i = 0; i < n.path().size(); i++) {
             Pair<OLSyntaxNode, OLSyntaxNode> node = n.path().get(i);
+            writer.setPrintQuotes(false);
             format(node.key());
+            writer.setPrintQuotes(true);
 
-            if (!(node.value() instanceof ConstantIntegerExpression &&
-                    ((ConstantIntegerExpression) node.value()).value() == 0)
+            if ((node.value() instanceof ConstantIntegerExpression)) {
+                int value = ((ConstantIntegerExpression) node.value()).value();
+            }
+
+            if (node.value() instanceof ConstantIntegerExpression //&&
+                //!(((ConstantIntegerExpression) node.value()).value() == 0)
                     ) {
                 writer.write("[");
                 format(node.value());
@@ -620,18 +702,17 @@ public class FormatterVisitor implements OLVisitor {
         }
     }
 
-    public void format(Range r )
-    {
-        if ( r.min() == r.max() && r.min() == 1 ) {
+    public void format(Range r) {
+        if (r.min() == r.max() && r.min() == 1) {
             return;
         }
 
-        if ( r.min() == 0 && r.max() == 1 ) {
-            writer.write( "?" );
-        } else if ( r.min() == 0 && r.max() == Integer.MAX_VALUE ) {
-            writer.write( "*" );
+        if (r.min() == 0 && r.max() == 1) {
+            writer.write("?");
+        } else if (r.min() == 0 && r.max() == Integer.MAX_VALUE) {
+            writer.write("*");
         } else {
-            writer.write( "[" + r.min() + "," + r.max() + "]" );
+            writer.write("[" + r.min() + "," + r.max() + "]");
         }
     }
 
