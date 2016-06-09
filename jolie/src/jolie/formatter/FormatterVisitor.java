@@ -33,9 +33,7 @@ public class FormatterVisitor implements OLVisitor {
 
     private void format(OLSyntaxNode node) {
         if (node != null) {
-            System.out.println(node);
             node.accept(this);
-            System.out.println(writer.getIndentation());
         }
     }
 
@@ -100,7 +98,6 @@ public class FormatterVisitor implements OLVisitor {
     @Override
     public void visit(ParallelStatement n) {
         for (int i = 0; i < n.children().size(); i++) {
-            System.out.println(n.children().get(i));
             if (n.children().get(i) instanceof SequenceStatement) {
                 writer.writeLineIndented("{");
                 writer.indent();
@@ -170,14 +167,12 @@ public class FormatterVisitor implements OLVisitor {
     @Override
     public void visit(RequestResponseOperationStatement n) {
         writer.write(n.id() + "(");
-        System.out.println(writer.getIndentation());
         format(n.inputVarPath());
         writer.write(")(");
         format(n.outputExpression());
         writer.writeLineIndented(") {");
         writer.indent();
         writer.indent();
-        System.out.println(n.process());
         format(n.process());
         writer.unindent();
         writer.unindent();
