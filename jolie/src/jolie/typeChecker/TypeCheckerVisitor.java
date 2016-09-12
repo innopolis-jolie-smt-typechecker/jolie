@@ -38,9 +38,7 @@ public class TypeCheckerVisitor implements OLVisitor {
     }
 
     private void format(Scanner.TokenType tokenType) {
-        String s = "(declare-fun properType (Term Term) Bool)\n+" +
-                "(assert (forall ((x Term)(y Term))(properType x y bool)))\n";
-        writer.write(s);
+
     }
 
     @Override
@@ -108,6 +106,9 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(AssignStatement n) {
+        String s = "(declare-fun properType (Term Term) Bool)\n+" +
+                "(assert (forall ((x Term)(y Term))(properType x y bool)))\n";
+        writer.write(s);
     }
 
     @Override
