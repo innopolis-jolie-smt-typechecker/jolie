@@ -14,7 +14,8 @@ public class TypeCheckerWriter {
     public TypeCheckerWriter(Writer writer) throws IOException {
         this.writer = writer;
         sb = new StringBuilder();
-        sb.append("(declare-sort Type)\n" +
+        sb.append(
+                "(declare-sort Type)\n" +
                 "(declare-sort Term)\n" +
                 "(declare-sort Long)\n" +
                 "(declare-sort Raw)\n" +
@@ -31,8 +32,10 @@ public class TypeCheckerWriter {
                 "(declare-fun raw () Type)\n" +
                 "(declare-fun void () Type)\n" +
                 "(declare-fun any () Type)\n" +
-                "(declare-fun undefined () Type)");
-        this.flush();
+                "(declare-fun undefined () Type)\n" +
+                "\n"
+        );
+//        this.flush();
     }
 
     protected void flush() throws IOException {
