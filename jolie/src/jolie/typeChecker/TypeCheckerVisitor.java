@@ -5,7 +5,7 @@ package jolie.typeChecker;
  */
 
 import jolie.lang.Constants;
-import jolie.lang.parse.*;
+import jolie.lang.parse.OLVisitor;
 import jolie.lang.parse.Scanner;
 import jolie.lang.parse.ast.*;
 import jolie.lang.parse.ast.courier.CourierChoiceStatement;
@@ -14,18 +14,16 @@ import jolie.lang.parse.ast.courier.NotificationForwardStatement;
 import jolie.lang.parse.ast.courier.SolicitResponseForwardStatement;
 import jolie.lang.parse.ast.expression.*;
 import jolie.lang.parse.ast.types.TypeChoiceDefinition;
-import jolie.lang.parse.ast.types.TypeDefinition;
 import jolie.lang.parse.ast.types.TypeDefinitionLink;
 import jolie.lang.parse.ast.types.TypeInlineDefinition;
 import jolie.util.Pair;
 import jolie.util.Range;
 
-import java.util.*;
+import java.util.Iterator;
 
 public class TypeCheckerVisitor implements OLVisitor {
-    private TypeCheckerWriter writer;
-
     boolean insideType = false;
+    private TypeCheckerWriter writer;
 
     public TypeCheckerVisitor(TypeCheckerWriter writer) {
         this.writer = writer;
@@ -63,15 +61,18 @@ public class TypeCheckerVisitor implements OLVisitor {
         if (!n.id().equals("main") && !n.id().equals("init")) {
             writer.write("(assert (forall ((i Void))(hasType (boxVoid i) void)))");
         }
+        n.body().accept(this);
     }
 
 
     @Override
     public void visit(ParallelStatement n) {
+        n.children().forEach(this::format);
     }
 
     @Override
     public void visit(SequenceStatement n) {
+        n.children().forEach(this::format);
     }
 
     @Override
@@ -106,9 +107,13 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(AssignStatement n) {
-        String s = "(declare-fun properType (Term Term) Bool)\n+" +
-                "(assert (forall ((x Term)(y Term))(properType x y bool)))\n";
-        writer.write(s);
+        String variablePath = n.variablePath().toPrettyString();
+
+        // TODO sketch; need to check types of both sides of the statement
+        String formula = "(declare-fun properType (Term Term) Bool)\n" + // incorrect, just sketch
+                "(assert (properType (" + variablePath + ") (" + n.expression() + ")))\n";
+//                "(assert (forall ((x Term)(y Term))(properType x y bool)))\n";
+        writer.write(formula);
     }
 
     @Override
@@ -129,6 +134,21 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(IfStatement n) {
+        StringBuilder formula = new StringBuilder();
+        for (Pair<OLSyntaxNode, OLSyntaxNode> statement : n.children()) {
+            OLSyntaxNode condition = statement.key();
+            OLSyntaxNode body = statement.value();
+
+            formula.append("(assert (hasType (").append(condition).append(") bool))\n");
+
+            if (body != null) {
+                body.accept(this);
+            }
+        }
+        if (n.elseProcess() != null) {
+            n.elseProcess().accept(this);
+        }
+        writer.write(formula.toString());
     }
 
     @Override
