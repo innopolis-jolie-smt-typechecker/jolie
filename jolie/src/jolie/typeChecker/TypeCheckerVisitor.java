@@ -20,6 +20,7 @@ import jolie.util.Pair;
 import jolie.util.Range;
 
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Stack;
 
 public class TypeCheckerVisitor implements OLVisitor {
@@ -141,6 +142,10 @@ public class TypeCheckerVisitor implements OLVisitor {
                 break;
         }
         writer.write(formula);
+
+        String statementId = getNextTermId();
+        writer.declareTermOnce(statementId);
+        usedTerms.push(new TermReference(statementId, expressionTerm.type));
     }
 
     @Override
@@ -191,16 +196,72 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(OrConditionNode n) {
-        for (int i = 0; i < n.children().size(); i++) {
+        int childrenSize = n.children().size();
+        LinkedList<TermReference> refs = new LinkedList<>();
+
+        for (int i = 0; i < childrenSize; i++) {
             check(n.children().get(i));
+            refs.add(usedTerms.pop());
         }
+
+        processLogicalExpression(refs);
     }
 
     @Override
     public void visit(AndConditionNode n) {
-        for (int i = 0; i < n.children().size(); i++) {
+        int childrenSize = n.children().size();
+        LinkedList<TermReference> refs = new LinkedList<>();
+
+        for (int i = 0; i < childrenSize; i++) {
             check(n.children().get(i));
+            refs.add(usedTerms.pop());
         }
+
+        processLogicalExpression(refs);
+    }
+
+    private void processLogicalExpression(LinkedList<TermReference> refs) {
+        JolieTermType expressionType;
+
+        if (refs.size() == 1) {
+            expressionType = refs.getFirst().type;
+        } else { // then we assume for now that it should be a boolean expression. In actual programs it can be wrong. Just to start with.
+            expressionType = JolieTermType.BOOL;
+            StringBuilder sb = new StringBuilder();
+            sb.append("(assert (= ");
+            for (TermReference ref : refs) {
+                sb.append("(typeOf ").append(ref.id).append(")").append(" ");
+            }
+            sb.append("bool))");
+            writer.writeLine(sb.toString());
+        }
+
+        String operationId = getNextTermId();
+        writer.declareTermOnce(operationId);
+
+        String formula = "";
+        switch (expressionType) {
+            case BOOL:
+                formula += "(assert (hasType " + operationId + " bool))\n";
+                break;
+            case INT:
+                formula += "(assert (hasType " + operationId + " int))\n";
+                break;
+            case LONG:
+                formula += "(assert (hasType " + operationId + " long))\n";
+                break;
+            case DOUBLE:
+                formula += "(assert (hasType " + operationId + " double))\n";
+                break;
+            case STRING:
+                formula += "(assert (hasType " + operationId + " string))\n";
+                break;
+            case VAR:
+                break;
+        }
+        writer.writeLine(formula);
+
+        usedTerms.push(new TermReference(operationId, expressionType));
     }
 
     @Override
