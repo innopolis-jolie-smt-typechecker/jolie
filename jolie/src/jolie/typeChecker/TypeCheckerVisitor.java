@@ -166,14 +166,13 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(IfStatement n) {
-        StringBuilder formula = new StringBuilder();
         for (Pair<OLSyntaxNode, OLSyntaxNode> statement : n.children()) {
             OLSyntaxNode condition = statement.key();
             OLSyntaxNode body = statement.value();
 
             check(condition);
             TermReference conditionTerm = usedTerms.pop();
-            formula.append("(assert (hasType ").append(conditionTerm.id).append(" bool))\n");
+            writer.writeLine("(assert (hasType " + conditionTerm.id + " bool))");
 
             if (body != null) {
                 body.accept(this);
@@ -182,7 +181,6 @@ public class TypeCheckerVisitor implements OLVisitor {
         if (n.elseProcess() != null) {
             n.elseProcess().accept(this);
         }
-        writer.write(formula.toString());
     }
 
     @Override
