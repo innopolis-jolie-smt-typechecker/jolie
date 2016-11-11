@@ -5,7 +5,7 @@ package jolie.typeChecker;
  */
 
 import jolie.lang.Constants;
-import jolie.lang.parse.*;
+import jolie.lang.parse.OLVisitor;
 import jolie.lang.parse.Scanner;
 import jolie.lang.parse.ast.*;
 import jolie.lang.parse.ast.courier.CourierChoiceStatement;
@@ -14,37 +14,44 @@ import jolie.lang.parse.ast.courier.NotificationForwardStatement;
 import jolie.lang.parse.ast.courier.SolicitResponseForwardStatement;
 import jolie.lang.parse.ast.expression.*;
 import jolie.lang.parse.ast.types.TypeChoiceDefinition;
-import jolie.lang.parse.ast.types.TypeDefinition;
 import jolie.lang.parse.ast.types.TypeDefinitionLink;
 import jolie.lang.parse.ast.types.TypeInlineDefinition;
 import jolie.util.Pair;
 import jolie.util.Range;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Stack;
 
 public class TypeCheckerVisitor implements OLVisitor {
+    private Integer nextConstId = 0;
     private TypeCheckerWriter writer;
-
-    boolean insideType = false;
+    private Stack<TermReference> usedTerms = new Stack<>();
 
     public TypeCheckerVisitor(TypeCheckerWriter writer) {
         this.writer = writer;
     }
 
-    private void format(OLSyntaxNode node) {
+    private String getNextTermId() {
+        String id = "$$__term_id_" + nextConstId.toString();
+        nextConstId++;
+        return id;
+    }
+
+    private void check(OLSyntaxNode node) {
         if (node != null) {
             node.accept(this);
         }
     }
 
-    private void format(Scanner.TokenType tokenType) {
+    private void check(Scanner.TokenType tokenType) {
 
     }
 
     @Override
     public void visit(Program n) {
         for (OLSyntaxNode node : n.children()) {
-            format(node);
+            check(node);
         }
     }
 
@@ -63,15 +70,17 @@ public class TypeCheckerVisitor implements OLVisitor {
         if (!n.id().equals("main") && !n.id().equals("init")) {
             writer.write("(assert (forall ((i Void))(hasType (boxVoid i) void)))");
         }
+        n.body().accept(this);
     }
-
 
     @Override
     public void visit(ParallelStatement n) {
+        n.children().forEach(this::check);
     }
 
     @Override
     public void visit(SequenceStatement n) {
+        n.children().forEach(this::check);
     }
 
     @Override
@@ -106,9 +115,37 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(AssignStatement n) {
-        String s = "(declare-fun properType (Term Term) Bool)\n+" +
-                "(assert (forall ((x Term)(y Term))(properType x y bool)))\n";
-        writer.write(s);
+        String variablePath = n.variablePath().toPrettyString();
+        writer.declareTermOnce(variablePath);
+
+        check(n.expression());
+        TermReference expressionTerm = usedTerms.pop();
+
+        String formula = "(assert (sameType " + variablePath + " " + expressionTerm.id + "))\n";
+        switch (expressionTerm.type) {
+            case BOOL:
+                formula += "(assert (hasType " + variablePath + " bool))\n";
+                break;
+            case INT:
+                formula += "(assert (hasType " + variablePath + " int))\n";
+                break;
+            case LONG:
+                formula += "(assert (hasType " + variablePath + " long))\n";
+                break;
+            case DOUBLE:
+                formula += "(assert (hasType " + variablePath + " double))\n";
+                break;
+            case STRING:
+                formula += "(assert (hasType " + variablePath + " string))\n";
+                break;
+            case VAR:
+                break;
+        }
+        writer.write(formula);
+
+        String statementId = getNextTermId();
+        writer.declareTermOnce(statementId);
+        usedTerms.push(new TermReference(statementId, expressionTerm.type));
     }
 
     @Override
@@ -129,6 +166,23 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(IfStatement n) {
+        StringBuilder formula = new StringBuilder();
+        for (Pair<OLSyntaxNode, OLSyntaxNode> statement : n.children()) {
+            OLSyntaxNode condition = statement.key();
+            OLSyntaxNode body = statement.value();
+
+            check(condition);
+            TermReference conditionTerm = usedTerms.pop();
+            formula.append("(assert (hasType ").append(conditionTerm.id).append(" bool))\n");
+
+            if (body != null) {
+                body.accept(this);
+            }
+        }
+        if (n.elseProcess() != null) {
+            n.elseProcess().accept(this);
+        }
+        writer.write(formula.toString());
     }
 
     @Override
@@ -142,24 +196,72 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(OrConditionNode n) {
-        int i = 0;
-        format(n.children().get(0));
-        i++;
-        for (; i < n.children().size(); i++) {
-            writer.write(" || ");
-            format(n.children().get(i));
+        int childrenSize = n.children().size();
+        LinkedList<TermReference> refs = new LinkedList<>();
+
+        for (int i = 0; i < childrenSize; i++) {
+            check(n.children().get(i));
+            refs.add(usedTerms.pop());
         }
+
+        processLogicalExpression(refs);
     }
 
     @Override
     public void visit(AndConditionNode n) {
-        int i = 0;
-        format(n.children().get(0));
-        i++;
-        for (; i < n.children().size(); i++) {
-            writer.write(" && ");
-            format(n.children().get(i));
+        int childrenSize = n.children().size();
+        LinkedList<TermReference> refs = new LinkedList<>();
+
+        for (int i = 0; i < childrenSize; i++) {
+            check(n.children().get(i));
+            refs.add(usedTerms.pop());
         }
+
+        processLogicalExpression(refs);
+    }
+
+    private void processLogicalExpression(LinkedList<TermReference> refs) {
+        JolieTermType expressionType;
+
+        if (refs.size() == 1) {
+            expressionType = refs.getFirst().type;
+        } else { // then we assume for now that it should be a boolean expression. In actual programs it can be wrong. Just to start with.
+            expressionType = JolieTermType.BOOL;
+            StringBuilder sb = new StringBuilder();
+            sb.append("(assert (= ");
+            for (TermReference ref : refs) {
+                sb.append("(typeOf ").append(ref.id).append(")").append(" ");
+            }
+            sb.append("bool))");
+            writer.writeLine(sb.toString());
+        }
+
+        String operationId = getNextTermId();
+        writer.declareTermOnce(operationId);
+
+        String formula = "";
+        switch (expressionType) {
+            case BOOL:
+                formula += "(assert (hasType " + operationId + " bool))\n";
+                break;
+            case INT:
+                formula += "(assert (hasType " + operationId + " int))\n";
+                break;
+            case LONG:
+                formula += "(assert (hasType " + operationId + " long))\n";
+                break;
+            case DOUBLE:
+                formula += "(assert (hasType " + operationId + " double))\n";
+                break;
+            case STRING:
+                formula += "(assert (hasType " + operationId + " string))\n";
+                break;
+            case VAR:
+                break;
+        }
+        writer.writeLine(formula);
+
+        usedTerms.push(new TermReference(operationId, expressionType));
     }
 
     @Override
@@ -169,38 +271,56 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(CompareConditionNode n) {
-        format(n.leftExpression());
-        writer.write(" ");
-        format(n.opType());
-        writer.write(" ");
-        format(n.rightExpression());
+        check(n.leftExpression());
+        TermReference leftExpressionTerm = usedTerms.pop();
+        check(n.rightExpression());
+        TermReference rightExpressionTerm = usedTerms.pop();
+
+        writer.writeLine("(assert (sameType " + leftExpressionTerm.id + " " + rightExpressionTerm.id + "))");
+
+        String operationId = getNextTermId();
+        writer.declareTermOnce(operationId);
+        usedTerms.push(new TermReference(operationId, JolieTermType.BOOL));
     }
 
     @Override
     public void visit(ConstantIntegerExpression n) {
-        //writer.write("\"");
-        writer.write(Integer.toString(n.value()));
-        //writer.write("\"");
-
+        String constId = getNextTermId();
+        writer.declareTermOnce(constId);
+        writer.writeLine("(assert (hasType " + constId + " int))");
+        usedTerms.push(new TermReference(constId, JolieTermType.INT));
     }
 
     @Override
     public void visit(ConstantDoubleExpression n) {
-        writer.write(Double.toString(n.value()));
+        String constId = getNextTermId();
+        writer.declareTermOnce(constId);
+        writer.writeLine("(assert (hasType " + constId + " double))");
+        usedTerms.push(new TermReference(constId, JolieTermType.DOUBLE));
     }
 
     @Override
     public void visit(ConstantBoolExpression n) {
-        writer.write(Boolean.toString(n.value()));
+        String constId = getNextTermId();
+        writer.declareTermOnce(constId);
+        writer.writeLine("(assert (hasType " + constId + " bool))");
+        usedTerms.push(new TermReference(constId, JolieTermType.BOOL));
     }
 
     @Override
     public void visit(ConstantLongExpression n) {
-        writer.write(Long.toString(n.value()) + "L");
+        String constId = getNextTermId();
+        writer.declareTermOnce(constId);
+        writer.writeLine("(assert (hasType " + constId + " long))");
+        usedTerms.push(new TermReference(constId, JolieTermType.LONG));
     }
 
     @Override
     public void visit(ConstantStringExpression n) {
+        String constId = getNextTermId();
+        writer.declareTermOnce(constId);
+        writer.writeLine("(assert (hasType " + constId + " string))");
+        usedTerms.push(new TermReference(constId, JolieTermType.STRING));
     }
 
     @Override
@@ -213,13 +333,13 @@ public class TypeCheckerVisitor implements OLVisitor {
             if (i > 0) {
                 switch (pair.key()) {
                     case MULTIPLY:
-                        writer.write(" * ");
+//                        writer.write(" * ");
                         break;
                     case DIVIDE:
-                        writer.write(" / ");
+//                        writer.write(" / ");
                         break;
                     case MODULUS:
-                        writer.write(" % ");
+//                        writer.write(" % ");
                         break;
                     default:
                         break;
@@ -230,7 +350,7 @@ public class TypeCheckerVisitor implements OLVisitor {
                 //   writer.write(" - ");
                 //}
             }
-            format(pair.value());
+            check(pair.value());
         }
     }
 
@@ -242,18 +362,18 @@ public class TypeCheckerVisitor implements OLVisitor {
             pair = it.next();
             if (i > 0) {
                 if (pair.key() == Constants.OperandType.ADD) {
-                    writer.write(" + ");
+//                    writer.write(" + ");
                 } else {
-                    writer.write(" - ");
+//                    writer.write(" - ");
                 }
             }
-            format(pair.value());
+            check(pair.value());
         }
     }
 
     @Override
     public void visit(VariableExpressionNode n) {
-        format(n.variablePath());
+        check(n.variablePath());
     }
 
     @Override
@@ -321,7 +441,7 @@ public class TypeCheckerVisitor implements OLVisitor {
     @Override
     public void visit(ValueVectorSizeExpressionNode n) {
         writer.write("#");
-        format(n.variablePath());
+        check(n.variablePath());
     }
 
     @Override
@@ -357,7 +477,7 @@ public class TypeCheckerVisitor implements OLVisitor {
     public void visit(IsTypeExpressionNode n) {
         if (n.type() == IsTypeExpressionNode.CheckType.DEFINED) {
             writer.write("is_defined(");
-            format(n.variablePath());
+            check(n.variablePath());
             writer.write(")");
         }
     }
@@ -366,12 +486,12 @@ public class TypeCheckerVisitor implements OLVisitor {
     public void visit(InstanceOfExpressionNode n) {
         if (n.expression() instanceof AssignStatement) {
             writer.write("(");
-            format(((AssignStatement) n.expression()).variablePath());
+            check(((AssignStatement) n.expression()).variablePath());
             writer.write(" = ");
-            format(((AssignStatement) n.expression()).expression());
+            check(((AssignStatement) n.expression()).expression());
             writer.write(")");
         } else {
-            format(n.expression());
+            check(n.expression());
         }
         writer.write(" instanceof ");
         writer.write(n.type().id());
@@ -381,7 +501,7 @@ public class TypeCheckerVisitor implements OLVisitor {
     public void visit(TypeCastExpressionNode n) {
         writer.write(n.type().id());
         writer.write("(");
-        format(n.expression());
+        check(n.expression());
         writer.write(")");
     }
 
@@ -406,13 +526,14 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(VariablePathNode n) {
+        usedTerms.push(new TermReference(n.toPrettyString(), JolieTermType.VAR));
     }
 
     @Override
     public void visit(TypeInlineDefinition n) {
     }
 
-    public void format(Range r) {
+    public void check(Range r) {
         if (r.min() == r.max() && r.min() == 1) {
             return;
         }
@@ -490,5 +611,19 @@ public class TypeCheckerVisitor implements OLVisitor {
     @Override
     public void visit(TypeChoiceDefinition n) {
 
+    }
+
+    private enum JolieTermType {
+        STRING, INT, LONG, BOOL, DOUBLE, VAR
+    }
+
+    private class TermReference {
+        public String id;
+        public JolieTermType type;
+
+        TermReference(String id, JolieTermType type) {
+            this.id = id;
+            this.type = type;
+        }
     }
 }
