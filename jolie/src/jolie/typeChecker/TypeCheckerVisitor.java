@@ -234,6 +234,7 @@ public class TypeCheckerVisitor implements OLVisitor {
         if (refs.size() == 1) {
             expressionType = refs.getFirst().type;
         } else { // then we assume for now that it should be a boolean expression. In actual programs it can be wrong. Just to start with.
+            // TODO process not-boolean constructions
             expressionType = JolieTermType.BOOL;
             StringBuilder sb = new StringBuilder();
             sb.append("(assert (= ");
@@ -274,7 +275,15 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(NotExpressionNode n) {
+        OLSyntaxNode expression = n.expression();
 
+        check(expression);
+        TermReference conditionTerm = usedTerms.pop();
+        writer.writeLine("(assert (hasType " + conditionTerm.id + " bool))");
+
+        String operationId = getNextTermId();
+        writer.declareTermOnce(operationId);
+        usedTerms.push(new TermReference(operationId, JolieTermType.BOOL));
     }
 
     @Override
