@@ -44,7 +44,7 @@ public class TypeCheckerWriter {
             sb.append("\n");
         }
 
-        sb.append(";; Describe type functions behavior\n");
+        sb.append(";; Describe type functions behavior\n"); // TODO maybe biconitional assertions needed?
         for (int i = 0; i < types.length; i++) {
             sb.append("(assert (forall ((t Term)) (=> (hasType t " + types[i] + ") (= (typeOf t) " + types[i] + "))))\n");
         }
