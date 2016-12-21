@@ -230,9 +230,14 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     private void processLogicalExpression(LinkedList<TermReference> refs) {
         JolieTermType expressionType;
+        String operationId = getNextTermId();
 
         if (refs.size() == 1) {
-            expressionType = refs.getFirst().type;
+            TermReference ref = refs.getFirst();
+            expressionType = ref.type;
+            if (expressionType.equals(JolieTermType.VAR)) {
+                operationId = ref.id;
+            }
         } else { // then we assume for now that it should be a boolean expression. In actual programs it can be wrong. Just to start with.
             // TODO process not-boolean constructions
             expressionType = JolieTermType.BOOL;
@@ -245,7 +250,6 @@ public class TypeCheckerVisitor implements OLVisitor {
             writer.writeLine(sb.toString());
         }
 
-        String operationId = getNextTermId();
         writer.declareTermOnce(operationId);
 
         String formula = "";
@@ -479,6 +483,22 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(ForStatement n) {
+        OLSyntaxNode init = n.init();
+        OLSyntaxNode condition = n.condition();
+        OLSyntaxNode post = n.post();
+        OLSyntaxNode body = n.body();
+
+        check(init);
+
+        check(condition);
+        TermReference conditionTerm = usedTerms.pop();
+        writer.writeLine("(assert (hasType " + conditionTerm.id + " bool))");
+
+        check(post);
+
+        if (body != null) {
+            body.accept(this);
+        }
     }
 
     @Override
