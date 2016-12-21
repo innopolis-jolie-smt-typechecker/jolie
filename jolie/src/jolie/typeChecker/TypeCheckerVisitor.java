@@ -190,6 +190,16 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(WhileStatement n) {
+        OLSyntaxNode condition = n.condition();
+        OLSyntaxNode body = n.body();
+
+        check(condition);
+        TermReference conditionTerm = usedTerms.pop();
+        writer.writeLine("(assert (hasType " + conditionTerm.id + " bool))");
+
+        if (body != null) {
+            body.accept(this);
+        }
     }
 
     @Override
