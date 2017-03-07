@@ -52,7 +52,7 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(OneWayOperationDeclaration decl) {
-        writer.writeLine("(assert (forall ((i Undefined))(hasType (boxUndefined i) undefined)))");
+
     }
 
     @Override
@@ -63,7 +63,7 @@ public class TypeCheckerVisitor implements OLVisitor {
     @Override
     public void visit(DefinitionNode n) {
         if (!n.id().equals("main") && !n.id().equals("init")) {
-            writer.write("(assert (forall ((i Void))(hasType (boxVoid i) void)))");
+
         }
         n.body().accept(this);
     }
