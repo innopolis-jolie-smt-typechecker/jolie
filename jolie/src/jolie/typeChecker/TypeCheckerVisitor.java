@@ -1,10 +1,7 @@
 package jolie.typeChecker;
 
-/**
- * Created by Timur on 19.07.2016.
- */
-
 import jolie.lang.Constants;
+import jolie.lang.NativeType;
 import jolie.lang.parse.OLVisitor;
 import jolie.lang.parse.Scanner;
 import jolie.lang.parse.ast.*;
@@ -19,9 +16,7 @@ import jolie.lang.parse.ast.types.TypeInlineDefinition;
 import jolie.util.Pair;
 import jolie.util.Range;
 
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Stack;
+import java.util.*;
 
 public class TypeCheckerVisitor implements OLVisitor {
     private Integer nextConstId = 0;
@@ -541,10 +536,15 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(TypeCastExpressionNode n) {
-        writer.write(n.type().id());
-        writer.write("(");
+        String termId = getNextTermId();
+        JolieTermType termType = JolieTermType.fromString(n.type().id());
+
+        writer.declareTermOnce(termId);
+        writer.writeLine("(assert (hasType " + termId + " " + termType.id() + "))");
+
         check(n.expression());
-        writer.write(")");
+
+        usedTerms.push(new TermReference(termId, termType));
     }
 
     @Override
@@ -656,7 +656,34 @@ public class TypeCheckerVisitor implements OLVisitor {
     }
 
     private enum JolieTermType {
-        STRING, INT, LONG, BOOL, DOUBLE, VAR
+        STRING(NativeType.STRING.id()),
+        INT(NativeType.INT.id()),
+        LONG(NativeType.LONG.id()),
+        BOOL(NativeType.BOOL.id()),
+        DOUBLE(NativeType.DOUBLE.id()),
+        VAR("var");
+
+        private final static Map<String, JolieTermType> idMap = new HashMap<>();
+
+        static {
+            for (JolieTermType type : JolieTermType.values()) {
+                idMap.put(type.id(), type);
+            }
+        }
+
+        private final String id;
+
+        JolieTermType(String id) {
+            this.id = id;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public static JolieTermType fromString(String id) {
+            return idMap.get(id);
+        }
     }
 
     private class TermReference {
