@@ -1,12 +1,11 @@
 package jolie.typeChecker;
 
+import jolie.lang.NativeType;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.util.HashSet;
 
-/**
- * Created by Timur on 19.07.2016.
- */
 public class TypeCheckerWriter {
 
     private Writer writer;
@@ -27,11 +26,25 @@ public class TypeCheckerWriter {
                 "\n"
         );
 
-        String[] types = {"bool", "int", "long", "double", "string", "raw", "void", "undefined"};
+        NativeType[] nativeTypes = NativeType.values();
+        int nativeTypesLength = nativeTypes.length;
+
+        String[] types = new String[nativeTypesLength];
+
+        for (int i = 0; i < nativeTypesLength; i++) {
+            NativeType type = nativeTypes[i];
+
+            // we don't need 'any' type here, but we do need 'undefined', so just replace it
+            if (!type.equals(NativeType.ANY)) {
+                types[i] = type.id();
+            } else {
+                types[i] = "undefined";
+            }
+        }
 
         sb.append(";; Define types\n");
-        for (int i = 0; i < types.length; i++) {
-            sb.append("(declare-fun " + types[i] + " () Type)\n");
+        for (String type : types) {
+            sb.append("(declare-fun ").append(type).append(" () Type)\n");
         }
         sb.append("(declare-fun any () Type)\n"); // TODO clarify equality with other types
         sb.append("\n");
@@ -39,18 +52,18 @@ public class TypeCheckerWriter {
         sb.append(";; Ensure non-equality of types\n");
         for (int i = 0; i < types.length; i++) {
             for (int j = i + 1; j < types.length; j++) {
-                sb.append("(assert (not (= " + types[i] + " " + types[j] + ")))\n");
+                sb.append("(assert (not (= ").append(types[i]).append(" ").append(types[j]).append(")))\n");
             }
             sb.append("\n");
         }
 
         sb.append(";; Describe type functions behavior\n"); // TODO maybe biconitional assertions needed?
-        for (int i = 0; i < types.length; i++) {
-            sb.append("(assert (forall ((t Term)) (=> (hasType t " + types[i] + ") (= (typeOf t) " + types[i] + "))))\n");
+        for (String type : types) {
+            sb.append("(assert (forall ((t Term)) (= (hasType t ").append(type).append(") (= (typeOf t) ").append(type).append("))))\n");
         }
 
         sb.append("\n");
-        sb.append("(assert (forall ((t1 Term) (t2 Term)) (=> (sameType t1 t2) (= (typeOf t1) (typeOf t2)))))\n");
+        sb.append("(assert (forall ((t1 Term) (t2 Term)) (= (sameType t1 t2) (= (typeOf t1) (typeOf t2)))))\n");
         sb.append("\n");
 
         sb.append(";; Program constraints\n");
