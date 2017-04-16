@@ -641,7 +641,12 @@ public class FormatterVisitor implements OLVisitor {
     }
 
     @Override
-    public void visit(ForEachStatement n) {
+    public void visit(ForEachSubNodeStatement n) {
+
+    }
+
+    @Override
+    public void visit(ForEachArrayItemStatement n) {
         writer.writeIndented("foreach (");
         format(n.keyPath());
         writer.write(" : ");

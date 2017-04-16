@@ -502,7 +502,12 @@ public class TypeCheckerVisitor implements OLVisitor {
     }
 
     @Override
-    public void visit(ForEachStatement n) {
+    public void visit(ForEachSubNodeStatement n) {
+
+    }
+
+    @Override
+    public void visit(ForEachArrayItemStatement n) {
     }
 
     @Override
