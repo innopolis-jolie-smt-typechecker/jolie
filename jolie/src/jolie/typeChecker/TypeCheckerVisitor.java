@@ -111,15 +111,15 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(AssignStatement n) {
-        String variablePath = n.variablePath().toPrettyString();
-        writer.declareTermOnce(variablePath);
+        check(n.variablePath());
+        TermReference variablePathTerm = usedTerms.pop();
 
         check(n.expression());
         TermReference expressionTerm = usedTerms.pop();
 
-        String formula = "(assert (sameType " + variablePath + " " + expressionTerm.id + "))\n";
-        if (!JolieTermType.isMeaningfulType(expressionTerm.type)) {
-            formula += "(assert (hasType " + variablePath + " " + expressionTerm.type.id() + "))\n";
+        String formula = "(assert (sameType " + variablePathTerm.id + " " + expressionTerm.id + "))\n";
+        if (JolieTermType.isMeaningfulType(expressionTerm.type)) {
+            formula += "(assert (hasType " + variablePathTerm.id + " " + expressionTerm.type.id() + "))\n";
         }
         writer.write(formula);
 
@@ -476,11 +476,25 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(ForEachSubNodeStatement n) {
-
     }
 
     @Override
     public void visit(ForEachArrayItemStatement n) {
+        OLSyntaxNode keyPath = n.keyPath();
+        OLSyntaxNode targetPath = n.targetPath();
+        OLSyntaxNode body = n.body();
+
+        check(keyPath);
+        TermReference keyTerm = usedTerms.pop();
+
+        check(targetPath);
+        TermReference targetTerm = usedTerms.pop();
+
+        writer.writeLine("(assert (sameType " + keyTerm.id + " " + targetTerm.id + "))");
+
+        if (body != null) {
+            body.accept(this);
+        }
     }
 
     @Override
@@ -499,17 +513,15 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(InstanceOfExpressionNode n) {
-        if (n.expression() instanceof AssignStatement) {
-            writer.write("(");
-            check(((AssignStatement) n.expression()).variablePath());
-            writer.write(" = ");
-            check(((AssignStatement) n.expression()).expression());
-            writer.write(")");
-        } else {
-            check(n.expression());
-        }
-        writer.write(" instanceof ");
-        writer.write(n.type().id());
+        String termId = getNextTermId();
+        JolieTermType termType = JolieTermType.BOOL;
+
+        writer.declareTermOnce(termId);
+        writer.writeLine("(assert (hasType " + termId + " " + termType.id() + "))");
+
+        check(n.expression());
+
+        usedTerms.push(new TermReference(termId, termType));
     }
 
     @Override
@@ -546,7 +558,40 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(VariablePathNode n) {
-        usedTerms.push(new TermReference(n.toPrettyString(), JolieTermType.VAR));
+        // a[i] -> a
+        // a[i].b -> a.b
+        // brackets don't matter in type definition
+        // we assume that if a variable is an array, it is of the same type, as its first element
+
+        StringBuilder variablePath = new StringBuilder();
+
+        for (int i = 0; i < n.path().size(); i++) {
+            Pair<OLSyntaxNode, OLSyntaxNode> node = n.path().get(i);
+
+            if (n.isGlobal()) {
+                variablePath.append("global.");
+            }
+
+            if (node.key() instanceof ConstantStringExpression) {
+                variablePath.append(((ConstantStringExpression) node.key()).value());
+            } else {
+                // TODO throw an exception or handle the case
+            }
+
+            if (node.value() != null) {
+                check(node.value());
+                TermReference nodeValueTerm = usedTerms.pop();
+                writer.writeLine(assertTypeNumber(nodeValueTerm));
+            }
+
+            if (n.path().size() - 1 > i) {
+                variablePath.append(".");
+            }
+
+            writer.declareTermOnce(variablePath.toString());
+        }
+
+        usedTerms.push(new TermReference(variablePath.toString(), JolieTermType.VAR));
     }
 
     @Override
