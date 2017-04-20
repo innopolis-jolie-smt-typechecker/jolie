@@ -111,10 +111,19 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(AssignStatement n) {
-        check(n.variablePath());
+        processSimilarAssignments(n.variablePath(), n.expression());
+    }
+
+    @Override
+    public void visit(AddAssignStatement n) {
+        processSimilarAssignments(n.variablePath(), n.expression());
+    }
+
+    private void processSimilarAssignments(VariablePathNode variablePath, OLSyntaxNode expression) {
+        check(variablePath);
         TermReference variablePathTerm = usedTerms.pop();
 
-        check(n.expression());
+        check(expression);
         TermReference expressionTerm = usedTerms.pop();
 
         String formula = "(assert (sameType " + variablePathTerm.id + " " + expressionTerm.id + "))\n";
@@ -129,19 +138,34 @@ public class TypeCheckerVisitor implements OLVisitor {
     }
 
     @Override
-    public void visit(AddAssignStatement n) {
-    }
-
-    @Override
     public void visit(SubtractAssignStatement n) {
+        processSimilarNumericAssignments(n.variablePath(), n.expression());
     }
 
     @Override
     public void visit(MultiplyAssignStatement n) {
+        processSimilarNumericAssignments(n.variablePath(), n.expression());
     }
 
     @Override
     public void visit(DivideAssignStatement n) {
+        processSimilarNumericAssignments(n.variablePath(), n.expression());
+    }
+
+    private void processSimilarNumericAssignments(VariablePathNode variablePath, OLSyntaxNode expression) {
+        check(variablePath);
+        TermReference variablePathTerm = usedTerms.pop();
+
+        check(expression);
+        TermReference expressionTerm = usedTerms.pop();
+
+        String formula = "(assert (sameType " + variablePathTerm.id + " " + expressionTerm.id + "))\n";
+        formula += assertTypeNumber(variablePathTerm);
+        writer.write(formula);
+
+        String statementId = getNextTermId();
+        writer.declareTermOnce(statementId);
+        usedTerms.push(new TermReference(statementId, expressionTerm.type));
     }
 
     @Override
@@ -440,18 +464,33 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(PreIncrementStatement n) {
+        processIncDec(n.variablePath());
     }
 
     @Override
     public void visit(PostIncrementStatement n) {
+        processIncDec(n.variablePath());
     }
 
     @Override
     public void visit(PreDecrementStatement n) {
+        processIncDec(n.variablePath());
     }
 
     @Override
     public void visit(PostDecrementStatement n) {
+        processIncDec(n.variablePath());
+    }
+
+    private void processIncDec(VariablePathNode variablePath) {
+        check(variablePath);
+        TermReference variablePathTerm = usedTerms.pop();
+
+        writer.write(assertTypeNumber(variablePathTerm));
+
+        String statementId = getNextTermId();
+        writer.declareTermOnce(statementId);
+        usedTerms.push(new TermReference(statementId, variablePathTerm.type));
     }
 
     @Override
