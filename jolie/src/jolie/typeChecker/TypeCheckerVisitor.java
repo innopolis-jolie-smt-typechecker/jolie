@@ -207,31 +207,22 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(OrConditionNode n) {
-        int childrenSize = n.children().size();
-        LinkedList<TermReference> refs = new LinkedList<>();
-
-        for (int i = 0; i < childrenSize; i++) {
-            check(n.children().get(i));
-            refs.add(usedTerms.pop());
-        }
-
-        processLogicalExpression(refs);
+        processLogicalExpression(n.children());
     }
 
     @Override
     public void visit(AndConditionNode n) {
-        int childrenSize = n.children().size();
+        processLogicalExpression(n.children());
+    }
+
+    private void processLogicalExpression(List<OLSyntaxNode> children) {
         LinkedList<TermReference> refs = new LinkedList<>();
 
-        for (int i = 0; i < childrenSize; i++) {
-            check(n.children().get(i));
+        for (OLSyntaxNode child : children) {
+            check(child);
             refs.add(usedTerms.pop());
         }
 
-        processLogicalExpression(refs);
-    }
-
-    private void processLogicalExpression(LinkedList<TermReference> refs) {
         JolieTermType expressionType;
         String operationId = getNextTermId();
 
@@ -331,50 +322,50 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(ProductExpressionNode n) {
-        Pair<Constants.OperandType, OLSyntaxNode> pair;
-        Iterator<Pair<Constants.OperandType, OLSyntaxNode>> it =
-                n.operands().iterator();
-        for (int i = 0; i < n.operands().size(); i++) {
-            pair = it.next();
-            if (i > 0) {
-                switch (pair.key()) {
-                    case MULTIPLY:
-//                        writer.write(" * ");
-                        break;
-                    case DIVIDE:
-//                        writer.write(" / ");
-                        break;
-                    case MODULUS:
-//                        writer.write(" % ");
-                        break;
-                    default:
-                        break;
-                }
-                //if (pair.key() == Constants.OperandType.ADD) {
-                //   writer.write(" + ");
-                //} else {
-                //   writer.write(" - ");
-                //}
-            }
-            check(pair.value());
-        }
+        processArithmetic(n.operands());
     }
 
     @Override
     public void visit(SumExpressionNode n) {
-        Pair<Constants.OperandType, OLSyntaxNode> pair;
-        Iterator<Pair<Constants.OperandType, OLSyntaxNode>> it = n.operands().iterator();
-        for (int i = 0; i < n.operands().size(); i++) {
-            pair = it.next();
-            if (i > 0) {
-                if (pair.key() == Constants.OperandType.ADD) {
-//                    writer.write(" + ");
-                } else {
-//                    writer.write(" - ");
-                }
-            }
+        processArithmetic(n.operands());
+    }
+
+    private void processArithmetic(List<Pair<Constants.OperandType, OLSyntaxNode>> operands) {
+        LinkedList<TermReference> refs = new LinkedList<>();
+
+        for (Pair<Constants.OperandType, OLSyntaxNode> pair : operands) {
             check(pair.value());
+            refs.add(usedTerms.pop());
         }
+
+        TermReference firstRef = refs.getFirst();
+        JolieTermType expressionType = firstRef.type;
+        String operationId = getNextTermId();
+
+        if (refs.size() == 1) { // if it is a constant or a variable, leave it be
+            if (expressionType.equals(JolieTermType.VAR)) {
+                operationId = firstRef.id;
+            }
+        } else { // else assume that every operand should be the same type as the first one
+            // TODO make type numeric? we can add int to long
+            StringBuilder sb = new StringBuilder();
+            sb.append("(assert (= ");
+            for (TermReference ref : refs) {
+                sb.append("(typeOf ").append(ref.id).append(")").append(" ");
+            }
+            sb.append("))");
+            writer.writeLine(sb.toString());
+        }
+
+        writer.declareTermOnce(operationId);
+
+        if (JolieTermType.isMeaningfulType(expressionType)) {
+            writer.writeLine("(assert (hasType " + operationId + " " + expressionType.id() + "))");
+        } else if (!operationId.equals(firstRef.id)) {
+            writer.writeLine("(assert (sameType " + operationId + " " + firstRef.id + "))");
+        }
+
+        usedTerms.push(new TermReference(operationId, expressionType));
     }
 
     @Override
@@ -543,11 +534,14 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(IsTypeExpressionNode n) {
-        if (n.type() == IsTypeExpressionNode.CheckType.DEFINED) {
-            writer.write("is_defined(");
-            check(n.variablePath());
-            writer.write(")");
-        }
+        TermReference newTerm = new TermReference(getNextTermId(), JolieTermType.BOOL);
+
+        writer.declareTermOnce(newTerm.id);
+        writer.writeLine("(assert (hasType " + newTerm.id + " " + newTerm.type.id() + "))");
+
+        check(n.variablePath());
+
+        usedTerms.push(newTerm);
     }
 
     @Override
