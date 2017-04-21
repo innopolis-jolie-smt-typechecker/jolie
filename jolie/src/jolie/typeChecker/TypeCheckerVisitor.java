@@ -85,6 +85,7 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(OneWayOperationStatement n) {
+        check(n.inputVarPath());
     }
 
     @Override
@@ -380,11 +381,15 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(Scope n) {
+        check(n.body());
     }
 
     @Override
     public void visit(InstallStatement n) {
-
+        Pair<String, OLSyntaxNode>[] pairs = n.handlersFunction().pairs();
+        for (Pair<String, OLSyntaxNode> pair : pairs) {
+            check(pair.value());
+        }
     }
 
     @Override
@@ -394,7 +399,7 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(ThrowStatement n) {
-
+        check(n.expression());
     }
 
     @Override
@@ -687,7 +692,8 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(SolicitResponseForwardStatement n) {
-
+        check(n.inputVariablePath());
+        check(n.outputVariablePath());
     }
 
     @Override
