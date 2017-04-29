@@ -61,7 +61,11 @@ public class TypeCheckerVisitor implements OLVisitor {
 
     @Override
     public void visit(ParallelStatement n) {
-        n.children().forEach(this::check);
+        for (OLSyntaxNode child : n.children()) {
+            writer.enterScope();
+            check(child);
+            writer.exitScope();
+        }
     }
 
     @Override
