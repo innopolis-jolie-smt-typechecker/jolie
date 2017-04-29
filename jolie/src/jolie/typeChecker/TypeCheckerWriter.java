@@ -4,26 +4,28 @@ import jolie.lang.NativeType;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.HashSet;
 
 public class TypeCheckerWriter {
 
     private Writer writer;
     private StringBuilder sb;
 
-    private HashSet<String> declaredConsts = new HashSet<>();
+    private StatementsContext context;
 
     public TypeCheckerWriter(Writer writer) throws IOException {
         this.writer = writer;
         sb = new StringBuilder();
+
+        context = new StatementsContext();
+
         sb.append(
                 "(declare-sort Type)\n" +
-                "(declare-sort Term)\n" +
-                "\n" +
-                "(declare-fun hasType (Term Type) Bool)\n" +
-                "(declare-fun sameType (Term Term) Bool)\n" +
-                "(declare-fun typeOf (Term) Type)\n" +
-                "\n"
+                        "(declare-sort Term)\n" +
+                        "\n" +
+                        "(declare-fun hasType (Term Type) Bool)\n" +
+                        "(declare-fun sameType (Term Term) Bool)\n" +
+                        "(declare-fun typeOf (Term) Type)\n" +
+                        "\n"
         );
 
         NativeType[] nativeTypes = NativeType.values();
@@ -75,6 +77,25 @@ public class TypeCheckerWriter {
         writer.flush();
     }
 
+    public void enterScope() {
+        sb.append("\n(push)\n");
+        context = context.push();
+    }
+
+    public void exitScope() {
+        sb.append("\n")
+                .append("(check-sat)\n")
+                .append("\n")
+                .append("(pop)\n")
+                .append("\n");
+
+        try {
+            context = context.pop();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public void write(String s) {
         sb.append(s);
     }
@@ -89,11 +110,35 @@ public class TypeCheckerWriter {
     }
 
     public boolean declareTermOnce(String name) {
-        if (!declaredConsts.contains(name)) {
+        if (!context.contains(name)) {
             writeLine("(declare-const " + name + " Term)");
-            declaredConsts.add(name);
+            context.add(name);
             return true;
         }
         return false;
+    }
+
+    public void assertTypeLikeBoolean(String termId) {
+        oneOfTypes(termId,
+                JolieTermType.BOOL,
+                JolieTermType.DOUBLE,
+                JolieTermType.INT,
+                JolieTermType.LONG,
+                JolieTermType.STRING);
+    }
+
+    public void assertTypeNumber(String termId) {
+        oneOfTypes(termId,
+                JolieTermType.INT,
+                JolieTermType.LONG,
+                JolieTermType.DOUBLE);
+    }
+
+    public void oneOfTypes(String termId, JolieTermType... types) {
+        sb.append("(assert (or ");
+        for (JolieTermType type : types) {
+            sb.append("(hasType ").append(termId).append(" ").append(type.id()).append(") ");
+        }
+        sb.append("))\n");
     }
 }

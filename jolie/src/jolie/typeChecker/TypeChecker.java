@@ -1,9 +1,5 @@
 package jolie.typeChecker;
 
-/**
- * Created by Timur on 19.07.2016.
- */
-
 import jolie.lang.parse.OLVisitor;
 import jolie.lang.parse.ast.OLSyntaxNode;
 
