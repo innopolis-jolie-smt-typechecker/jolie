@@ -2,9 +2,9 @@ package jolie.typeChecker;
 
 public class TermReference {
     private String id;
-    private JolieTermType type;
+    private TermType type;
 
-    TermReference(String id, JolieTermType type) {
+    TermReference(String id, TermType type) {
         this.id = id;
         this.type = type;
     }
@@ -13,7 +13,7 @@ public class TermReference {
         return id;
     }
 
-    public JolieTermType type() {
+    public TermType type() {
         return type;
     }
 }

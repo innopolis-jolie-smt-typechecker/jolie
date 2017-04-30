@@ -120,23 +120,23 @@ public class TypeCheckerWriter {
 
     public void assertTypeLikeBoolean(String termId) {
         oneOfTypes(termId,
-                JolieTermType.BOOL,
-                JolieTermType.DOUBLE,
-                JolieTermType.INT,
-                JolieTermType.LONG,
-                JolieTermType.STRING);
+                TermType.BOOL,
+                TermType.DOUBLE,
+                TermType.INT,
+                TermType.LONG,
+                TermType.STRING);
     }
 
     public void assertTypeNumber(String termId) {
         oneOfTypes(termId,
-                JolieTermType.INT,
-                JolieTermType.LONG,
-                JolieTermType.DOUBLE);
+                TermType.INT,
+                TermType.LONG,
+                TermType.DOUBLE);
     }
 
-    public void oneOfTypes(String termId, JolieTermType... types) {
+    public void oneOfTypes(String termId, TermType... types) {
         sb.append("(assert (or ");
-        for (JolieTermType type : types) {
+        for (TermType type : types) {
             sb.append("(hasType ").append(termId).append(" ").append(type.id()).append(") ");
         }
         sb.append("))\n");

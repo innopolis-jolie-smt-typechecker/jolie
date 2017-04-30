@@ -5,7 +5,7 @@ import jolie.lang.NativeType;
 import java.util.HashMap;
 import java.util.Map;
 
-public enum JolieTermType {
+public enum TermType {
     STRING(NativeType.STRING.id()),
     INT(NativeType.INT.id()),
     LONG(NativeType.LONG.id()),
@@ -14,17 +14,17 @@ public enum JolieTermType {
     VOID(NativeType.VOID.id()),
     VAR("var");
 
-    private final static Map<String, JolieTermType> idMap = new HashMap<>();
+    private final static Map<String, TermType> idMap = new HashMap<>();
 
     static {
-        for (JolieTermType type : JolieTermType.values()) {
+        for (TermType type : TermType.values()) {
             idMap.put(type.id(), type);
         }
     }
 
     private final String id;
 
-    JolieTermType(String id) {
+    TermType(String id) {
         this.id = id;
     }
 
@@ -32,11 +32,11 @@ public enum JolieTermType {
         return id;
     }
 
-    public static JolieTermType fromString(String id) {
+    public static TermType fromString(String id) {
         return idMap.get(id);
     }
 
-    public static boolean isMeaningfulType(JolieTermType type) {
+    public static boolean isMeaningful(TermType type) {
         return type.equals(STRING) ||
                 type.equals(INT) ||
                 type.equals(LONG) ||
