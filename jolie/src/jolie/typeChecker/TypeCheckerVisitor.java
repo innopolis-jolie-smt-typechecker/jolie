@@ -648,10 +648,10 @@ public class TypeCheckerVisitor implements OLVisitor {
             } else {
                 check(node.key());
 
-                TermReference keyValueTerm = termsContext.pop();
+                TermReference nodeKeyTerm = termsContext.pop();
 
-                if (TermType.isMeaningful(keyValueTerm.type())) {
-                    variablePath.append(keyValueTerm.id());
+                if (TermType.isMeaningful(nodeKeyTerm.type())) {
+                    variablePath.append(nodeKeyTerm.id());
                 } else {
                     variablePath.append("DYNAMIC_PATH_").append(Utils.getNextTermId());
                     writer.declareTermOnce(variablePath.toString());
